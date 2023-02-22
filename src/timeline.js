@@ -21,6 +21,7 @@ const TimeLine = class TimeLine {
         currentTime = new Date().getTime(),
         timeParts = [],
         isMove = false,
+        infiniteRolling = false,
         changeCallback = date => {}
     ) {
         this.canvas = document.getElementById(canvasId);
@@ -38,13 +39,16 @@ const TimeLine = class TimeLine {
         this.zoom = 24;
 
         this.currentTime = currentTime;
+        this.defaultLeftTime = new Date(new Date().setHours(0, 0, 0, 0)).getTime();
         this.timeParts = timeParts;
-        this.isMove = false;
+        this.isMove = isMove;
+        this.infiniteRolling = infiniteRolling,
         this.moveTimer = null;
         this.changeCallback = changeCallback;
 
         this.init();
-        this.setIsMove(isMove);
+        // 定时移动光标
+        // this.autoMoveCursor(isMove);
 
         /* *****************
             ## 事件处理
@@ -58,16 +62,23 @@ const TimeLine = class TimeLine {
 
         const _this = this;
         this.eventListener = {
+            click(event) {
+                // 游标移动
+                // _this.moveCursor(event);
+                // _this.clickEvent(event);
+            },
             wheel(event) {
                 // 事件this指向DOM元素
                 _this.wheelEvent(event);
                 _this.hoverMove(event);
             },
             mousedown(event) {
+                console.log(111)
                 _this.isMouseDownFlag = true;
                 _this.mousedownX = _this.getMouseXRelativePos(event);
             },
             mousemove(event) {
+                console.log(222)
                 if (_this.isMouseDownFlag) {
                     _this.isDragFlag = true;
                     _this.dragMove(event);
@@ -76,6 +87,7 @@ const TimeLine = class TimeLine {
                 }
             },
             mouseup(event) {
+                console.log(333)
                 if (!_this.isDragFlag) {
                     _this.clickEvent(event);
                     _this.hoverMove(event);
@@ -93,6 +105,7 @@ const TimeLine = class TimeLine {
             }
         };
 
+        this.canvas.addEventListener("click", this.eventListener.click);
         this.canvas.addEventListener("wheel", this.eventListener.wheel);
         this.canvas.addEventListener("mousedown", this.eventListener.mousedown);
         this.canvas.addEventListener("mousemove", this.eventListener.mousemove);
@@ -104,11 +117,12 @@ const TimeLine = class TimeLine {
         // 清空画布
         this.clearCanvas();
         // 画刻度处背景
-        this.fillScaleBg();
+        // this.fillScaleBg();
         // 画刻度
         this.drawScale();
         // 画游标
         this.drawCursor();
+        // 画色块区间
         if (this.timeParts.length) {
             this.timeParts.forEach(element => {
                 this.fillTimeParts(element);
@@ -121,7 +135,6 @@ const TimeLine = class TimeLine {
     }
     fillTimeParts(part) {
         // 一个像素多少毫秒
-
         let onePxsMS = this.canvas.width / (this.totalRulerHours * 60 * 60 * 1000);
         let beginX = (part.start - this.startTimestamp) * onePxsMS;
         let partWidth = (part.end - part.start) * onePxsMS;
@@ -170,56 +183,98 @@ const TimeLine = class TimeLine {
         // 某个刻度得时间
         let graduationTime;
         let lineHeight;
-        // 开始时间 = 中间时间 - 一半得整条时间
-        let startTimestamp = this.currentTime - (this.totalRulerHours * 60 * 60 * 1000) / 2;
-        // 因为中间点是currentTime是固定的 最右边不一定在某个刻度上 会有一定的偏移量
-        let leftOffsetMs = scaleUnit * 60 * 1000 - (startTimestamp % (scaleUnit * 60 * 1000));
-        // 开始时间偏移距离(px)
-        let leftOffsetPx = leftOffsetMs * oneMSPx;
-        // 一刻度多少毫秒
-        let oneScalesMS = scaleSpacing / oneMSPx;
-        // 文字颜色
-        this.ctx.fillStyle = "rgba(151,158,167,1)";
-        // 刻度线颜色
-        this.ctx.strokeStyle = "rgba(151,158,167,1)";
-        this.ctx.beginPath();
-        // 画刻度线
-        const _this = this;
-        function drawScaleLine(left, height) {
-            _this.ctx.moveTo(left, 0);
-            _this.ctx.lineTo(left, height);
-            _this.ctx.lineWidth = 1;
-        }
-        for (let i = 0; i < totalScales; i++) {
-            // 距离 = 开始得偏移距离 + 格数 * 每格得px;
-            graduationLeft = leftOffsetPx + i * scaleSpacing;
-            // 时间 = 左侧开始时间 + 偏移时间 + 格数 * 一格多少毫秒
-            graduationTime = startTimestamp + leftOffsetMs + i * oneScalesMS;
-            let date = new Date(graduationTime);
-            if ((graduationTime / (60 * 1000)) % mediumStep == 0) {
-                // 大格刻度
-                lineHeight = 15;
-                let scaleText = this.createScaleText(date);
-                this.ctx.fillText(scaleText, graduationLeft - 20, 30);
-            } else {
-                // 小格刻度
-                lineHeight = 10;
+        if (!this.infiniteRolling) {
+            // 开始时间 = 中间时间 - 一半得整条时间
+            let startTimestamp = this.currentTime - (this.totalRulerHours * 60 * 60 * 1000) / 2;
+            // 因为中间点是currentTime是固定的 最右边不一定在某个刻度上 会有一定的偏移量
+            let leftOffsetMs = scaleUnit * 60 * 1000 - (startTimestamp % (scaleUnit * 60 * 1000));
+            // 开始时间偏移距离(px)
+            let leftOffsetPx = leftOffsetMs * oneMSPx;
+            // 一刻度多少毫秒
+            let oneScalesMS = scaleSpacing / oneMSPx;
+            // 文字颜色
+            this.ctx.fillStyle = "rgba(151,158,167,1)";
+            // 刻度线颜色
+            this.ctx.strokeStyle = "rgba(151,158,167,1)";
+            this.ctx.beginPath();
+            // 画刻度线
+            const _this = this;
+            function drawScaleLine(left, height) {
+                _this.ctx.moveTo(left, 0);
+                _this.ctx.lineTo(left, height);
+                _this.ctx.lineWidth = 1;
             }
-            drawScaleLine(graduationLeft, lineHeight);
+            for (let i = 0; i < totalScales; i++) {
+                // 距离 = 开始得偏移距离 + 格数 * 每格得px;
+                graduationLeft = leftOffsetPx + i * scaleSpacing;
+                // 时间 = 左侧开始时间 + 偏移时间 + 格数 * 一格多少毫秒
+                graduationTime = startTimestamp + leftOffsetMs + i * oneScalesMS;
+                let date = new Date(graduationTime);
+                if ((graduationTime / (60 * 1000)) % mediumStep == 0) {
+                    // 大格刻度
+                    lineHeight = 15;
+                    let scaleText = this.createScaleText(date);
+                    this.ctx.fillText(scaleText, graduationLeft - 20, 30);
+                } else {
+                    // 小格刻度
+                    lineHeight = 10;
+                }
+                drawScaleLine(graduationLeft, lineHeight);
+            }
+        } else {
+            let startTimestamp = new Date(new Date().setHours(0, 0, 0, 0)).getTime();
+            // 一刻度多少毫秒
+            let oneScalesMS = scaleSpacing / oneMSPx;
+            // 文字颜色
+            this.ctx.fillStyle = "rgba(151,158,167,1)";
+            // 刻度线颜色
+            this.ctx.strokeStyle = "rgba(151,158,167,1)";
+            this.ctx.beginPath();
+            // 画刻度线
+            const _this = this;
+            function drawScaleLine(left, height) {
+                _this.ctx.moveTo(left, 0);
+                _this.ctx.lineTo(left, height);
+                _this.ctx.lineWidth = 1;
+            }
+            for (let i = 0; i < totalScales; i++) {
+                // 距离 = 开始得偏移距离 + 格数 * 每格得px;
+                graduationLeft = i * scaleSpacing;
+                // 时间 = 左侧开始时间 + 偏移时间 + 格数 * 一格多少毫秒
+                graduationTime = startTimestamp  + i * oneScalesMS;
+                let date = new Date(graduationTime);
+                if ((graduationTime / (60 * 1000)) % mediumStep == 0) {
+                    // 大格刻度
+                    lineHeight = 15;
+                    let scaleText = this.createScaleText(date);
+                    this.ctx.fillText(scaleText, graduationLeft - 20, 30);
+                } else {
+                    // 小格刻度
+                    lineHeight = 10;
+                }
+                drawScaleLine(graduationLeft, lineHeight);
+            }
         }
         this.ctx.stroke();
     }
     drawCursor() {
+        // 一分钟多少像素
+        let oneMinutePx = this.canvas.width / (this.totalRulerHours * 60);
+        // 一毫秒多少像素
+        let oneMSPx = oneMinutePx / (60 * 1000);
+        // 某个刻度距离最左端得距离
+        let graduationLeft = (this.currentTime - this.defaultLeftTime) * oneMSPx ;
+        console.log(graduationLeft,this.canvas.width,this.currentTime,oneMSPx, 111)
         this.ctx.beginPath();
-        this.ctx.moveTo(this.canvas.width / 2, 0);
-        this.ctx.lineTo(this.canvas.width / 2, 35);
+        this.ctx.moveTo(graduationLeft, 0);
+        this.ctx.lineTo(graduationLeft, 35);
         this.ctx.strokeStyle = "rgb(64, 196, 255)";
         this.ctx.lineWidth = 2;
         this.ctx.stroke();
         this.ctx.fillStyle = "rgb(64, 196, 255)";
         this.ctx.fillText(
             new Date(this.currentTime).format("yyyy-MM-dd hh:mm:ss"),
-            this.canvas.width / 2 - 60,
+            graduationLeft - 60,
             this.canvas.height - 20
         );
     }
@@ -247,7 +302,7 @@ const TimeLine = class TimeLine {
     addTimeParts(timeParts) {
         this.setTimeParts(this.timeParts.concat(timeParts));
     }
-    setIsMove(isMove) {
+    autoMoveCursor(isMove) {
         if (this.isMove === isMove) return;
         this.isMove = isMove;
         const clearTimer = () => {
@@ -276,9 +331,9 @@ const TimeLine = class TimeLine {
         return this.currentTime;
     }
     createScaleText(time) {
-        if (time.getHours() === 0 && time.getMinutes() === 0 && time.getMilliseconds() === 0) {
-            return time.format("yyyy-MM-dd");
-        }
+        // if (time.getHours() === 0 && time.getMinutes() === 0 && time.getMilliseconds() === 0) {
+        //     return time.format("yyyy-MM-dd");
+        // }
         return time.format("hh:mm");
     }
     dragMove(event) {
@@ -293,6 +348,19 @@ const TimeLine = class TimeLine {
         this.mousedownX = posX;
     }
     hoverMove(event) {
+        let posX = this.getMouseXRelativePos(event);
+        let time = this.getMousePosTime(event);
+        this.init();
+        this.ctx.beginPath();
+        this.ctx.moveTo(posX + 1, 0);
+        this.ctx.lineTo(posX + 1, this.canvas.height);
+        this.ctx.strokeStyle = "rgb(194, 202, 215)";
+        this.ctx.lineWidth = 1;
+        this.ctx.stroke();
+        this.ctx.fillStyle = "rgb(194, 202, 215)";
+        this.ctx.fillText(time.format("yyyy-MM-dd hh:mm:ss"), posX - 50, this.canvas.height - 10);
+    }
+    moveCursor(event) {
         let posX = this.getMouseXRelativePos(event);
         let time = this.getMousePosTime(event);
         this.init();
