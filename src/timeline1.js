@@ -28,7 +28,7 @@ const TimeLine = class TimeLine {
         this.ctx = this.canvas.getContext("2d");
 
         // 可选的每个间隔代表多少分钟
-        this.minutePerStep = [1, 2, 5, 10, 15, 20, 30, 60, 120, 180, 240, 360, 720, 1440];
+        this.minutePerStep = [1, 5, 10, 15, 30, 60, 120];
         // 最小刻度间距
         this.minScaleSpacing = 20;
         // 整个时间轴表示的时间长度
@@ -179,7 +179,9 @@ const TimeLine = class TimeLine {
                 break;
             }
         }
-
+        // 缩放/距离可视区域左侧距离=>可视左侧时间=>可视刻度数=>渲染可视区域刻度尺
+        // 拖拽/ 可视左侧时间跟当前点击位置时间对比确定向左向右移动=>重绘刻度尺=>记录当前左侧可视时间
+        // 当前面板总宽度this.canvas.width，欲获取当前元素占页面宽度
         let totalScales = this.canvas.width / scaleSpacing;
         // 某个刻度距离最左端得距离
         let graduationLeft;
@@ -189,11 +191,11 @@ const TimeLine = class TimeLine {
         // 一刻度多少毫秒
         let oneScalesMS = scaleSpacing / oneMSPx;
         // 当前时间距离左侧刻度数量
-        let leftScales = this.getPosByTime(this.currentTime) / scaleSpacing;
+        let leftScales = Math.floor(this.getPosByTime(this.currentTime) / scaleSpacing);
         // TODO 当前左侧时间   算出当前最左侧时间,继而渲染刻度尺，当前存在oneScalesMS * leftScales为固定值的问题
         // 左侧 + 格数*单位 = 当前
         let currentLeftTime = new Date(this.currentTime - oneScalesMS * leftScales).getTime();
-        console.log(oneScalesMS, leftScales,oneScalesMS * leftScales, currentLeftTime, 111)
+        console.log(new Date(currentLeftTime))
         let startTimestamp = this.hasWheel ? currentLeftTime : this.defaultLeftTime;
         // 文字颜色
         this.ctx.fillStyle = "rgba(151,158,167,1)";
@@ -207,21 +209,46 @@ const TimeLine = class TimeLine {
             _this.ctx.lineTo(left, height);
             _this.ctx.lineWidth = 1;
         }
+        // for (let i = 0; i < totalScales; i++) {
+        //     // 距离 = 开始得偏移距离 + 格数 * 每格得px;
+        //     graduationLeft = i * scaleSpacing;
+        //     // 时间 = 左侧开始时间 + 偏移时间 + 格数 * 一格多少毫秒
+        //     // 本方案不可行：从最左侧开始绘制，跟可视区域无关联，所以时间线跟刻度尺没有联动效果，从而导致拖拽等功能也不可用
+        //     graduationTime = startTimestamp  + i * oneScalesMS;
+        //     let date = new Date(graduationTime);
+        //     if ((graduationTime / (60 * 1000)) % mediumStep == 0) {
+        //         // 大格刻度
+        //         lineHeight = 15;
+        //         let scaleText = this.createScaleText(date);
+        //         this.ctx.fillText(scaleText, graduationLeft - 20, 30);
+        //     } else {
+        //         // 小格刻度
+        //         lineHeight = 10;
+        //     }
+        //     drawScaleLine(graduationLeft, lineHeight);
+        // }
         for (let i = 0; i < totalScales; i++) {
             // 距离 = 开始得偏移距离 + 格数 * 每格得px;
             graduationLeft = i * scaleSpacing;
             // 时间 = 左侧开始时间 + 偏移时间 + 格数 * 一格多少毫秒
-            graduationTime = startTimestamp  + i * oneScalesMS;
+            graduationTime = startTimestamp + i * oneScalesMS;
+            // console.log(graduationLeft, new Date(graduationTime))
             let date = new Date(graduationTime);
+            console.log('mediumStep',  graduationTime,(graduationTime / (60 * 1000)) % mediumStep, mediumStep, this.zoom)
             if ((graduationTime / (60 * 1000)) % mediumStep == 0) {
                 // 大格刻度
                 lineHeight = 15;
                 let scaleText = this.createScaleText(date);
-                this.ctx.fillText(scaleText, graduationLeft - 20, 30);
+                this.ctx.fillText(scaleText, graduationLeft - 10, 30);
             } else {
                 // 小格刻度
+                let scaleText = this.createScaleText(date);
+                this.ctx.fillText(scaleText, graduationLeft, 30);
                 lineHeight = 10;
             }
+            // if (this.zoom === 24) {
+            //     if ()
+            // }
             drawScaleLine(graduationLeft, lineHeight);
         }
         this.ctx.stroke();
@@ -285,9 +312,6 @@ const TimeLine = class TimeLine {
         return this.currentTime;
     }
     createScaleText(time) {
-        // if (time.getHours() === 0 && time.getMinutes() === 0 && time.getMilliseconds() === 0) {
-        //     return time.format("yyyy-MM-dd");
-        // }
         return time.format("hh:mm");
     }
     dragMove(event) {
@@ -384,7 +408,7 @@ const TimeLine = class TimeLine {
     // 获取当前时间位置
     getPosByTime(currentTime) {
         const time = currentTime - this.defaultLeftTime;
-        const pos = this.canvas.width / (this.totalRulerHours * 60 * 60 * 1000) * time;
+        const pos = time / (24 * 60 * 60 * 1000) * this.canvas.width;
         this.currentTimePos = pos;
         return pos;
     }
