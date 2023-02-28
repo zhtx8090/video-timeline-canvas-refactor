@@ -42,7 +42,9 @@ const TimeLine = class TimeLine {
         this.currentTime = currentTime;
         this.currentTimePos = 0;
         this.defaultLeftTime = new Date(new Date().setHours(0, 0, 0, 0)).getTime();
+        this.currentLeftTime = this.defaultLeftTim;
         this.startTimestamp = this.defaultLeftTime;
+        this.count = 0;
         this.leftHandTime = this.defaultLeftTime;
         this.timeParts = timeParts;
         this.isMove = isMove;
@@ -195,8 +197,38 @@ const TimeLine = class TimeLine {
         // TODO 当前左侧时间   算出当前最左侧时间,继而渲染刻度尺，当前存在oneScalesMS * leftScales为固定值的问题
         // 左侧 + 格数*单位 = 当前
         let currentLeftTime = new Date(this.currentTime - oneScalesMS * leftScales).getTime();
-        console.log(new Date(currentLeftTime))
+        const hours = new Date(currentLeftTime).getHours();
+        const minutes = new Date(currentLeftTime).getMinutes();
+        // 计算临近的整点分钟
+        let roundedMinutes = Math.floor(minutes / 5) * 5 % 60;
+        // const switchRound = (params) => {
+        //     switch(true) {
+        //         case (params === 24):
+        //             console.log(Math.floor(minutes / 60) * 60 % 60, 11)
+        //         return Math.floor(minutes / 60) * 60 % 60;
+        //         case (params === 13):
+        //             console.log(Math.floor(minutes / 60) * 60 % 60, 2)
+        //         return Math.floor(minutes / 30) * 30 % 60;
+        //         case (params === 12):
+        //             console.log(Math.floor(minutes / 60) * 60 % 60, 3)
+        //         return Math.floor(minutes / 30) * 30 % 60;
+        //         case (params === 1):
+        //             console.log(Math.floor(minutes / 60) * 60 % 60, 4)
+        //         return Math.floor(minutes / 5) * 5 % 60;
+        //     }
+        // }
+        // switchRound(this.zoom);
+
+        // console.log('roundedMinutes', roundedMinutes, minutes)
+        currentLeftTime = new Date(new Date(currentLeftTime).setHours(hours, roundedMinutes, 0, 0)).getTime();
+        // console.log(currentLeftTime)
+        this.currentLeftTime = currentLeftTime;
+
         let startTimestamp = this.hasWheel ? currentLeftTime : this.defaultLeftTime;
+        if (this.count === 0) {
+            this.startTimestamp = startTimestamp;
+            this.count++;
+        }
         // 文字颜色
         this.ctx.fillStyle = "rgba(151,158,167,1)";
         // 刻度线颜色
@@ -209,46 +241,45 @@ const TimeLine = class TimeLine {
             _this.ctx.lineTo(left, height);
             _this.ctx.lineWidth = 1;
         }
-        // for (let i = 0; i < totalScales; i++) {
-        //     // 距离 = 开始得偏移距离 + 格数 * 每格得px;
-        //     graduationLeft = i * scaleSpacing;
-        //     // 时间 = 左侧开始时间 + 偏移时间 + 格数 * 一格多少毫秒
-        //     // 本方案不可行：从最左侧开始绘制，跟可视区域无关联，所以时间线跟刻度尺没有联动效果，从而导致拖拽等功能也不可用
-        //     graduationTime = startTimestamp  + i * oneScalesMS;
-        //     let date = new Date(graduationTime);
-        //     if ((graduationTime / (60 * 1000)) % mediumStep == 0) {
-        //         // 大格刻度
-        //         lineHeight = 15;
-        //         let scaleText = this.createScaleText(date);
-        //         this.ctx.fillText(scaleText, graduationLeft - 20, 30);
-        //     } else {
-        //         // 小格刻度
-        //         lineHeight = 10;
-        //     }
-        //     drawScaleLine(graduationLeft, lineHeight);
-        // }
+        // console.log('zoom',this.zoom)
         for (let i = 0; i < totalScales; i++) {
             // 距离 = 开始得偏移距离 + 格数 * 每格得px;
             graduationLeft = i * scaleSpacing;
             // 时间 = 左侧开始时间 + 偏移时间 + 格数 * 一格多少毫秒
-            graduationTime = startTimestamp + i * oneScalesMS;
-            // console.log(graduationLeft, new Date(graduationTime))
+            graduationTime = this.startTimestamp + i * oneScalesMS;
             let date = new Date(graduationTime);
-            console.log('mediumStep',  graduationTime,(graduationTime / (60 * 1000)) % mediumStep, mediumStep, this.zoom)
-            if ((graduationTime / (60 * 1000)) % mediumStep == 0) {
-                // 大格刻度
-                lineHeight = 15;
-                let scaleText = this.createScaleText(date);
-                this.ctx.fillText(scaleText, graduationLeft - 10, 30);
-            } else {
-                // 小格刻度
-                let scaleText = this.createScaleText(date);
-                this.ctx.fillText(scaleText, graduationLeft, 30);
-                lineHeight = 10;
+            if (this.zoom === 24) {
+                // console.log('graduationTime',graduationTime)
+                if ((graduationTime / 1000) % (3600) === 0) {
+                    // console.log(222)
+                    // 大格刻度
+                    lineHeight = 15;
+                    let scaleText = this.createScaleText(date);
+                    this.ctx.fillText(scaleText, graduationLeft - 10, 30);
+                } else {
+                    lineHeight = 10;
+                }
             }
-            // if (this.zoom === 24) {
-            //     if ()
+            // if (this.zoom === 12 || this.zoom === 13) {
+            //     if ((graduationTime / 1000) % (60 * 30) === 0) {
+            //         // 大格刻度
+            //         lineHeight = 15;
+            //         let scaleText = this.createScaleText(date);
+            //         this.ctx.fillText(scaleText, graduationLeft - 10, 30);
+            //     } else {
+            //         lineHeight = 10;
+            //     }
             // }
+            if (this.zoom === 1) {
+                if ((graduationTime / 1000) % (60) === 0) {
+                    // 大格刻度
+                    lineHeight = 15;
+                    let scaleText = this.createScaleText(date);
+                    this.ctx.fillText(scaleText, graduationLeft - 10, 30);
+                } else {
+                    lineHeight = 10;
+                }
+            }
             drawScaleLine(graduationLeft, lineHeight);
         }
         this.ctx.stroke();
@@ -257,7 +288,7 @@ const TimeLine = class TimeLine {
         // 一毫秒多少像素
         let oneMSPx = this.canvas.width / (24 * 60 * 60 * 1000);
         // 某个刻度距离最左端得距离
-        let graduationLeft = (this.currentTime - this.defaultLeftTime) * oneMSPx ;
+        let graduationLeft = (this.currentTime - this.startTimestamp) * oneMSPx;
         this.ctx.beginPath();
         this.ctx.moveTo(graduationLeft, 0);
         this.ctx.lineTo(graduationLeft, 35);
@@ -356,7 +387,7 @@ const TimeLine = class TimeLine {
         console.log('posX', posX, this.totalRulerHours)
         // 每像素多少毫秒
         let onePxsMS = this.canvas.width / (this.totalRulerHours * 60 * 60 * 1000);
-        let time = new Date(this.defaultLeftTime + posX / onePxsMS);
+        let time = new Date(this.startTimestamp + posX / onePxsMS);
         return time;
     }
     clickEvent(event) {
@@ -368,7 +399,7 @@ const TimeLine = class TimeLine {
         // 是放大一倍还是缩小一倍
         let delta = Math.max(-1, Math.min(1, event.wheelDelta));
         if (delta < 0) {
-            this.zoom = this.zoom + 4;
+            this.zoom = this.zoom + 24;
             if (this.zoom >= 24) {
                 //放大最大24小时
                 this.zoom = 24;
@@ -376,7 +407,8 @@ const TimeLine = class TimeLine {
             this.totalRulerHours = this.zoom;
         } else if (delta > 0) {
             // 放大
-            this.zoom = this.zoom - 4;
+            this.startTimestamp = this.currentLeftTime;
+            this.zoom = this.zoom - 24;
             if (this.zoom <= 1) {
                 //缩小最小1小时
                 this.zoom = 1;
@@ -384,6 +416,7 @@ const TimeLine = class TimeLine {
             this.totalRulerHours = this.zoom;
         }
         this.hasWheel = true;
+        this.count = 0;
         this.init();
     }
     getMouseXRelativePos(event) {
@@ -403,6 +436,7 @@ const TimeLine = class TimeLine {
             newTime = time;
         }
         this.currentTime = newTime;
+        console.log(new Date(this.currentTime), 333)
         this.init();
     }
     // 获取当前时间位置
@@ -411,13 +445,6 @@ const TimeLine = class TimeLine {
         const pos = time / (24 * 60 * 60 * 1000) * this.canvas.width;
         this.currentTimePos = pos;
         return pos;
-    }
-    // 获取当前左侧时间
-    getLeftTime() {
-        // 每像素多少毫秒
-        let onePxsMS = this.canvas.width / (this.totalRulerHours * 60 * 60 * 1000);
-        let time = new Date(this.defaultLeftTime + posX / onePxsMS);
-        return time;
     }
     clearCanvas() {
         this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
