@@ -36,7 +36,7 @@
             function changeCallback(time) {
                 console.log("TCL: time", time);
             }
-            var a = new TimeLine("canvas1", new Date().getTime("2022-02-22 00:00:00"), timeParts1, true, false, changeCallback);
+            var a = new TimeLine("canvas1", new Date("2023-03-01 09:00:00").getTime(), timeParts1, true, changeCallback);
             function stopMove() {
                 a.setIsMove(false);
             }
